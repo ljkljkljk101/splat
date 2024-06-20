@@ -129,14 +129,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="ConsoleApplication1.cpp" />
-    <ClCompile Include="glad.c" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="GaussianData.h" />
-    <ClInclude Include="GaussianSplatRenderable.h" />
-  </ItemGroup>
-  <ItemGroup>
     <None Include="packages.config" />
     <None Include="shader\multi_radixsort.glsl" />
     <None Include="shader\multi_radixsort_histograms.glsl" />
@@ -144,6 +136,15 @@
     <None Include="shader\splat_frag.glsl" />
     <None Include="shader\splat_geom.glsl" />
     <None Include="shader\splat_vert.glsl" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\GaussianData.h" />
+    <ClInclude Include="src\GaussianSplatRenderable.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\GaussianSplatRenderable.cpp" />
+    <ClCompile Include="src\glad.c" />
+    <ClCompile Include="src\main.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

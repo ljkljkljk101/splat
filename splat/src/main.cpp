@@ -51,7 +51,7 @@ int main()
 
 	// glfw window creation
 	// --------------------
-	GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
+	GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Simple Splat", NULL, NULL);
 	if (window == NULL)
 	{
 		std::cout << "Failed to create GLFW window" << std::endl;
@@ -72,13 +72,10 @@ int main()
 		std::cout << "Failed to initialize GLAD" << std::endl;
 		return -1;
 	}
-	glEnable(GL_BLEND);
-	glBlendEquation(GL_FUNC_ADD);
-	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
 	CGaussianSplatRenderable g;
 
-	g.loadFile("C:\\Users\\14948\\Desktop\\cg\\splatapult\\splatapult-main\\data\\point_cloud_truck.ply");
+	g.loadFile("data/test.ply");
 	float t = 0;
 	glfwSwapInterval(0);
 	bool mode = false;
