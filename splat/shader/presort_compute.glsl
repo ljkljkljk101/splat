@@ -45,13 +45,13 @@ void main()
     float xx = p.x / depth;
     float yy = p.y / depth;
 
-    const float CLIP = 1.5f;
+    const float CLIP = 1.3f;
     if (depth > 0.0f && xx < CLIP && xx > -CLIP && yy < CLIP && yy > -CLIP)
     {
         uint count = atomicCounterIncrement(output_count);
         // 16.16 fixed point
         //uint fixedPointZ = uint(0xffffffff) - uint(clamp(depth, 0.0f, 65535.0f) * 65536.0f);
-		uint fixedPointZ = keyMax - uint((depth / nearFar.y) * keyMax);
+		uint fixedPointZ =  uint((depth / nearFar.y) * keyMax);
         quantizedZs[count] = fixedPointZ;
         indices[count] = idx;
     }

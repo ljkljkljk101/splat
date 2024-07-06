@@ -16,8 +16,15 @@ in vec2 frag_p;  // 2D screen space center of the guassian
 
 out vec4 out_color;
 uniform bool is_point_cloud;
+uniform sampler2D screenTexture;
+uniform vec4 viewport;
 void main()
 {
+    vec2 texcoord = vec2(gl_FragCoord.x / 1200, gl_FragCoord.y / 670);
+    vec4 dstColor = texture(screenTexture, texcoord);
+    if (dstColor.a > 0.999) {
+        discard;
+    }
     vec2 d = gl_FragCoord.xy - frag_p;
 
     // TODO: Use texture for gaussian evaluation
@@ -27,6 +34,7 @@ void main()
 
     out_color.rgb = frag_color.a * g * frag_color.rgb;
     out_color.a = frag_color.a * g;
+
 
     /*
     // can be used to determine overdraw.

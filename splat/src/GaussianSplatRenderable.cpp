@@ -128,6 +128,41 @@ void CGaussianSplatRenderable::loadFile(const std::string& vFilename) {
 	glGenBuffers(1, &m_AtomicCounter);
 	glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, m_AtomicCounter);
 	glBufferStorage(GL_ATOMIC_COUNTER_BUFFER, sizeof(uint32_t) * m_CounterVec.size(), m_CounterVec.data(), GL_DYNAMIC_STORAGE_BIT | GL_MAP_READ_BIT);
+
+	glGenFramebuffers(1, &framebuffer);
+	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+	glBindBuffer(GL_FRAMEBUFFER, framebuffer);
+
+	glGenTextures(1, &m_ColorTexture);
+	glBindTexture(GL_TEXTURE_2D, m_ColorTexture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1200, 670, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_ColorTexture, 0);
+
+	// 创建深度纹理附件
+	glGenTextures(1, &m_DepthTexture);
+	glBindTexture(GL_TEXTURE_2D, m_DepthTexture);
+
+	// 设置纹理参数，这里使用 GL_DEPTH_COMPONENT24 确保深度值存储为 24 位
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, 1200, 670, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+
+	// 设置纹理采样参数
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+	// 将深度纹理附件作为深度附件附加到帧缓冲对象
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, m_DepthTexture, 0);
+
+	GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+	if (status != GL_FRAMEBUFFER_COMPLETE) {
+		// 处理帧缓冲对象错误
+		std::cerr << "Framebuffer is not complete!" << std::endl;
+	}
+
+	// 解绑帧缓冲对象
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 
@@ -149,13 +184,14 @@ void CGaussianSplatRenderable::render(float vDeltaTime, const glm::mat4& vProjec
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 	}
 
+	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
 	glEnable(GL_BLEND);
-
 	glBlendEquation(GL_FUNC_ADD);
-	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+	glBlendFunc(GL_ONE_MINUS_DST_ALPHA, GL_ONE);
 
-	glm::vec4 clearColor(0.0f, 0.0f, 0.0f, 1.0f);
+	glm::vec4 clearColor(0.0f, 0.0f, 0.0f, 0.0f);
 	glClearColor(clearColor.r, clearColor.g, clearColor.b, clearColor.a);
+	glClearDepth(0.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	const uint32_t MAX_DEPTH = std::numeric_limits<uint32_t>::max();
 
@@ -247,6 +283,10 @@ void CGaussianSplatRenderable::render(float vDeltaTime, const glm::mat4& vProjec
 	}
 	glm::vec3 eye = glm::vec3(glm::inverse(vViewMat * m_ModelMat)[3]);
 	m_SplatProgram.use();
+	m_SplatProgram.setInt("screenTexture", 0);
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, m_ColorTexture);
 	m_SplatProgram.setMat4("viewMat", vViewMat * m_ModelMat);
 	m_SplatProgram.setMat4("projMat", vProjectionMat);
 	m_SplatProgram.setVec4("viewport", vViewport);
@@ -254,18 +294,76 @@ void CGaussianSplatRenderable::render(float vDeltaTime, const glm::mat4& vProjec
 	m_SplatProgram.setVec3("eye", eye);
 	m_SplatProgram.setBool("is_point_cloud", m_IsPointCloud || !m_AttenuationMode);
 	glBindVertexArray(m_VAO);
-	glDrawElements(GL_POINTS, sortCount, GL_UNSIGNED_INT, 0);
+	int t1 = sortCount / 2, t2 = sortCount - sortCount / 2;
+
+	glDisable(GL_DEPTH_TEST);
+	glDrawElements(GL_POINTS, sortCount / 2, GL_UNSIGNED_INT, 0);
+
+	glEnable(GL_DEPTH_TEST);
+	glDepthFunc(GL_GEQUAL);
+
+	depthShader.use();
+	depthShader.setInt("screenTexture", 0);
+
+	glBindVertexArray(quadVAO);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, m_ColorTexture);
+	glDrawArrays(GL_TRIANGLES, 0, 6);
+
+
+	m_SplatProgram.use();
+	glBindVertexArray(m_VAO);
+	glEnable(GL_DEPTH_TEST);
+	glDrawElements(GL_POINTS, t2, GL_UNSIGNED_INT, (void*)(t1 * sizeof(unsigned int)));
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glDisable(GL_DEPTH_TEST); // disable depth test so screen-space quad isn't discarded due to depth test.
+
+	glDisable(GL_BLEND);
+	// clear all relevant buffers
+	glClearColor(1.0f, 1.0f, 1.0f, 1.0f); // set clear color to white (not really necessary actually, since we won't be able to see behind the quad anyways)
+	glClear(GL_COLOR_BUFFER_BIT);
+
+	screenShader.use();
+	screenShader.setInt("screenTexture", 0);
+
+	glBindVertexArray(quadVAO);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, m_ColorTexture);	// use the color attachment texture as the texture of the quad plane
+	glDrawArrays(GL_TRIANGLES, 0, 6);
 }
 
 CGaussianSplatRenderable::CGaussianSplatRenderable() : m_SplatProgram("shader/splat_vert.glsl", "shader/splat_frag.glsl", "shader/splat_geom.glsl"),
 m_PresortProgram("shader/presort_compute.glsl"),
 m_SortProgram("shader/multi_radixsort.glsl"),
-m_HistogramProgram("shader/multi_radixsort_histograms.glsl") {
+m_HistogramProgram("shader/multi_radixsort_histograms.glsl"),
+screenShader("shader/screen_vert.glsl", "shader/screen_frag.glsl"),
+depthShader("shader/write_depth_vert.glsl", "shader/write_depth_frag.glsl"){
 	LOCAL_SIZE = 256;
 	RADIX_SORT_BINS = 256;
 	m_ModelMat = glm::mat4(1.0);
 	m_ModelMat = glm::rotate(m_ModelMat, 3.14f, glm::vec3(0, 0, 1));
 	m_ModelMat = glm::scale(m_ModelMat, glm::vec3(5, 5, 5));
+	float quadVertices[] = { // vertex attributes for a quad that fills the entire screen in Normalized Device Coordinates.
+		// positions   // texCoords
+		-1.0f,  1.0f,  0.0f, 1.0f,
+		-1.0f, -1.0f,  0.0f, 0.0f,
+		 1.0f, -1.0f,  1.0f, 0.0f,
+
+		-1.0f,  1.0f,  0.0f, 1.0f,
+		 1.0f, -1.0f,  1.0f, 0.0f,
+		 1.0f,  1.0f,  1.0f, 1.0f
+	};
+	// screen quad VAO
+	glGenVertexArrays(1, &quadVAO);
+	glGenBuffers(1, &quadVBO);
+	glBindVertexArray(quadVAO);
+	glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
 }
 CGaussianSplatRenderable::~CGaussianSplatRenderable() {
 	glDeleteVertexArrays(1, &m_VAO);

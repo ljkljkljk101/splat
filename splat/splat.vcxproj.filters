@@ -20,6 +20,18 @@
     <None Include="shader\splat_vert.glsl">
       <Filter>shader</Filter>
     </None>
+    <None Include="shader\screen_frag.glsl">
+      <Filter>shader</Filter>
+    </None>
+    <None Include="shader\screen_vert.glsl">
+      <Filter>shader</Filter>
+    </None>
+    <None Include="shader\write_depth_frag.glsl">
+      <Filter>shader</Filter>
+    </None>
+    <None Include="shader\write_depth_vert.glsl">
+      <Filter>shader</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="源文件">

@@ -31,13 +31,20 @@ private:
 	unsigned int m_IndexSSBO2;
 	unsigned int m_HistogramSSBO;
 	unsigned int m_AtomicCounter;
-
-	unsigned int m_NumBlocksPerWorkgroup = 128;
+	unsigned int m_Width;
+	unsigned int m_Height;
+	unsigned int m_ColorTexture;
+	unsigned int m_DepthTexture;
+	unsigned int framebuffer;
+	unsigned int quadVAO, quadVBO;
+	unsigned int m_NumBlocksPerWorkgroup = 32;
 	float m_Scale = 1.0;
 	bool m_AttenuationMode = true;
 	bool m_IsPointCloud = false;
 	std::vector<uint32_t> m_CounterVec;
 	glm::mat4 m_ModelMat;
+	Shader screenShader;
+	Shader depthShader;
 	Shader m_SplatProgram;
 	Shader m_PresortProgram;
 	Shader m_HistogramProgram;
