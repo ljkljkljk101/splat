@@ -175,7 +175,8 @@ void CGaussianSplatRenderable::changeMode(bool vShouldrawPointCloud) {
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 	}
 }
-void CGaussianSplatRenderable::render(float vDeltaTime, const glm::mat4& vProjectionMat, const glm::mat4& vViewMat, const glm::vec4& vViewport, const glm::vec2& vNearFar, float vScale) {
+void CGaussianSplatRenderable::render(float vDeltaTime, const glm::vec4 vFocalAndTan, const glm::mat4& vProjectionMat, const glm::mat4& vViewMat, const glm::vec4& vViewport, const glm::vec2& vNearFar, float vScale) {
+	//这里是改变高斯球的大小的，方便观察高斯球
 	if (m_Scale != vScale) {
 		m_Scale = vScale;
 		m_Data.updateCov(vScale, m_IsPointCloud);
@@ -195,6 +196,8 @@ void CGaussianSplatRenderable::render(float vDeltaTime, const glm::mat4& vProjec
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	const uint32_t MAX_DEPTH = std::numeric_limits<uint32_t>::max();
 
+
+	//对数据进行预处理，方便后续排序
 	m_PresortProgram.use();
 	m_PresortProgram.setMat4("modelViewProj", vProjectionMat * vViewMat * m_ModelMat);
 	m_PresortProgram.setVec2("nearFar", vNearFar);
@@ -219,6 +222,8 @@ void CGaussianSplatRenderable::render(float vDeltaTime, const glm::mat4& vProjec
 	uint32_t sortCount = m_CounterVec[0];
 	glUnmapBuffer(GL_ATOMIC_COUNTER_BUFFER);
 	glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, 0);
+
+	//这里对高斯球进行排序，由近到远
 	{
 
 		const uint32_t NUM_ELEMENTS = static_cast<uint32_t>(sortCount);
@@ -281,18 +286,25 @@ void CGaussianSplatRenderable::render(float vDeltaTime, const glm::mat4& vProjec
 		glBindBuffer(GL_COPY_WRITE_BUFFER, m_EBO);
 		glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, sortCount * sizeof(uint32_t));
 	}
+
+	//这里进行splat操作，先渲染
 	glm::vec3 eye = glm::vec3(glm::inverse(vViewMat * m_ModelMat)[3]);
 	m_SplatProgram.use();
 	m_SplatProgram.setInt("screenTexture", 0);
 
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, m_ColorTexture);
+
 	m_SplatProgram.setMat4("viewMat", vViewMat * m_ModelMat);
 	m_SplatProgram.setMat4("projMat", vProjectionMat);
 	m_SplatProgram.setVec4("viewport", vViewport);
 	m_SplatProgram.setVec4("projParams", glm::vec4(0.0f, vNearFar.x, vNearFar.y, 0.0f));
 	m_SplatProgram.setVec3("eye", eye);
 	m_SplatProgram.setBool("is_point_cloud", m_IsPointCloud || !m_AttenuationMode);
+	m_SplatProgram.setFloat("focal_x", vFocalAndTan.x);
+	m_SplatProgram.setFloat("focal_y", vFocalAndTan.y);
+	m_SplatProgram.setFloat("tan_fovx", vFocalAndTan.z);
+	m_SplatProgram.setFloat("tan_fovy", vFocalAndTan.w);
 	glBindVertexArray(m_VAO);
 	int t1 = sortCount / 2, t2 = sortCount - sortCount / 2;
 
@@ -338,12 +350,11 @@ m_PresortProgram("shader/presort_compute.glsl"),
 m_SortProgram("shader/multi_radixsort.glsl"),
 m_HistogramProgram("shader/multi_radixsort_histograms.glsl"),
 screenShader("shader/screen_vert.glsl", "shader/screen_frag.glsl"),
-depthShader("shader/write_depth_vert.glsl", "shader/write_depth_frag.glsl"){
+depthShader("shader/write_depth_vert.glsl", "shader/write_depth_frag.glsl") {
 	LOCAL_SIZE = 256;
 	RADIX_SORT_BINS = 256;
 	m_ModelMat = glm::mat4(1.0);
 	m_ModelMat = glm::rotate(m_ModelMat, 3.14f, glm::vec3(0, 0, 1));
-	m_ModelMat = glm::scale(m_ModelMat, glm::vec3(5, 5, 5));
 	float quadVertices[] = { // vertex attributes for a quad that fills the entire screen in Normalized Device Coordinates.
 		// positions   // texCoords
 		-1.0f,  1.0f,  0.0f, 1.0f,

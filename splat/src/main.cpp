@@ -75,7 +75,7 @@ int main()
 	//glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 	CGaussianSplatRenderable g;
 
-	g.loadFile("data/test.ply"); 
+	g.loadFile("C:/Users/14948/Desktop/cg/3d_GS/gaussian-splatting-main/gaussian-splatting/output/9b4238f9-c/point_cloud/iteration_30000/point_cloud.ply");
 	float t = 0;
 	glfwSwapInterval(0);
 	bool mode = false;
@@ -111,7 +111,12 @@ int main()
 			g.changeMode(mode);
 		}
 		g.setAttenuation(attenuationMode);
-		g.render(deltaTime, projection, viewMat, viewport, nearFar, updateScale);
+
+		float tan_fovy = tan(glm::radians(camera.Zoom) / 2.0f);
+		float tan_fovx = tan_fovy * SCR_WIDTH / SCR_HEIGHT;
+		float focaly = 0.5f * SCR_HEIGHT / tan_fovy;
+		float focalx = 0.5f * SCR_WIDTH / tan_fovx;
+		g.render(deltaTime, { focalx,focaly,tan_fovx,tan_fovy }, projection, viewMat, viewport, nearFar, updateScale);
 
 
 		glfwSwapBuffers(window);
@@ -212,7 +217,7 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
 	lastX = xpos;
 	lastY = ypos;
 
-	camera.ProcessMouseMovement(xoffset*2, yoffset*2);
+	camera.ProcessMouseMovement(xoffset * 2, yoffset * 2);
 }
 
 // glfw: whenever the mouse scroll wheel scrolls, this callback is called

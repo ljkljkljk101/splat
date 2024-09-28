@@ -16,7 +16,7 @@ public:
 	}
 	void loadFile(const std::string& vFilename);
 	void changeMode(bool vShouldrawPointCloud);
-	void render(float vDeltaTime, const glm::mat4& vProjectionMat, const glm::mat4& vViewMat, const glm::vec4& vViewport, const glm::vec2& vNearFar, float vScale = 1.0);
+	void render(float vDeltaTime, const glm::vec4 vFocalAndTan, const glm::mat4& vProjectionMat, const glm::mat4& vViewMat, const glm::vec4& vViewport, const glm::vec2& vNearFar, float vScale = 1.0);
 private:
 	CGaussianData m_Data;
 	unsigned int m_VAO;

@@ -17,7 +17,10 @@ uniform mat4 projMat;  // used to project view coordinates into clip coordinates
 uniform vec4 projParams;  // x = HEIGHT / tan(FOVY / 2), y = Z_NEAR, z = Z_FAR
 uniform vec4 viewport;  // x, y, WIDTH, HEIGHT
 uniform vec3 eye;
-
+uniform float focal_x;
+uniform float focal_y;
+uniform float tan_fovx;
+uniform float tan_fovy;
 in vec4 position;  // center of the gaussian in object coordinates, (with alpha crammed in to w)
 
 
@@ -157,37 +160,31 @@ void main(void)
     // t is in view coordinates
     float alpha = position.w;
     vec4 t = viewMat * vec4(position.xyz, 1.0f);
+    float limx = 1.3f * tan_fovx;
+    float limy = 1.3f * tan_fovy;
+    float txtz = t.x / t.z;
+    float tytz = t.y / t.z;
+    t.x = min(limx, max(-limx, txtz)) * t.z;
+    t.y = min(limy, max(-limy, tytz)) * t.z;
 
-    //float X0 = viewport.x;
-    float X0 = viewport.x * (0.00001f * projParams.y);  // one weird hack to prevent projParams from being compiled away
-    float Y0 = viewport.y;
-    float WIDTH = viewport.z;
-    float HEIGHT = viewport.w;
-    float Z_NEAR = projParams.y;
-    float Z_FAR = projParams.z;
-
-    // J is the jacobian of the projection and viewport transformations.
-    // this is an affine approximation of the real projection.
-    // because gaussians are closed under affine transforms.
-    float SX = projMat[0][0];
-    float SY = projMat[1][1];
-    float WZ =  projMat[3][2];
-    float tzSq = t.z * t.z;
-    float jsx = -(SX * WIDTH) / (2.0f * t.z);
-    float jsy = -(SY * HEIGHT) / (2.0f * t.z);
-    float jtx = (SX * t.x * WIDTH) / (2.0f * tzSq);
-    float jty = (SY * t.y * HEIGHT) / (2.0f * tzSq);
-    float jtz = ((Z_FAR - Z_NEAR) * WZ) / (2.0f * tzSq);
-    mat3 J = mat3(vec3(jsx, 0.0f, 0.0f),
-                  vec3(0.0f, jsy, 0.0f),
-                  vec3(jtx, jty, jtz));
-
+    mat3 J = mat3(
+        focal_x / t.z, 0.0f, -(focal_x * t.x) / (t.z * t.z),
+        0.0f, focal_y / t.z, -(focal_y * t.y) / (t.z * t.z),
+        0, 0, 0);
     // combine the affine transforms of W (viewMat) and J (approx of viewportMat * projMat)
     // using the fact that the new transformed covariance matrix V_Prime = JW * V * (JW)^T
     mat3 W = mat3(viewMat);
     mat3 V = mat3(cov3_col0, cov3_col1, cov3_col2);
     mat3 JW = J * W;
     mat3 V_prime = JW * V * transpose(JW);
+    //float X0 = viewport.x;
+
+    float WIDTH = viewport.z;
+    float HEIGHT = viewport.w;
+
+
+
+
 
     // now we can 'project' the 3D covariance matrix onto the xy plane by just dropping the last column and row.
     mat2 cov2D = mat2(V_prime);
@@ -199,10 +196,10 @@ void main(void)
     geom_cov2 = vec4(cov2D[0], cov2D[1]); // cram it into a vec4
 
     // geom_p is the gaussian center transformed into screen space
-    vec4 p4 = projMat * t;
-    geom_p = vec2(p4.x / p4.w, p4.y / p4.w);
-    geom_p.x = 0.5f * (WIDTH + (geom_p.x * WIDTH) + (2.0f * X0));
-    geom_p.y = 0.5f * (HEIGHT + (geom_p.y * HEIGHT) + (2.0f * Y0));
+    vec4 p4 = projMat * vec4(position.xyz, 1.0f);
+    geom_p = vec2(p4.x / (p4.w + 0.0000001f), p4.y / (p4.w + 0.0000001f));
+    geom_p.x = ((geom_p.x + 1.0) * WIDTH - 1.0) * 0.5; 
+    geom_p.y = ((geom_p.y + 1.0) * HEIGHT - 1.0) * 0.5;
 
     // compute radiance from sh
     vec3 v = normalize(position.xyz - eye);
